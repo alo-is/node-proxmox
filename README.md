@@ -1,7 +1,7 @@
 node-proxmox
 ============
 
-NodeJs Module to interract with Proxmox VE API. Full sync.
+NodeJs Module to interract with Proxmox VE API. Full async.
 
 Usage
 ============

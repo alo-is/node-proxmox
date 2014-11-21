@@ -33,7 +33,7 @@ module.exports = function ProxmoxApi(hostname, user, pve, password){
 		    	var data = JSON.parse(chunk).data;
 		        par.token = {ticket: data.ticket, CSRFPreventionToken: data.CSRFPreventionToken};
 		    	par.tokenTimestamp = new Date().getTime();	
-		    	if(callback != undefined)
+		    	if(typeof(callback) == 'function')
 		    		callback();
 		    });
 		});
@@ -101,7 +101,7 @@ module.exports = function ProxmoxApi(hostname, user, pve, password){
 		    });
 		    res.on('end', function(){
 				var dataa = JSON.parse(data).data;
-		        if(callback != undefined)
+		        if(typeof(callback) == 'function')
 		        	callback(dataa);
 			});
 		});
