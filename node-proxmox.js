@@ -28,14 +28,18 @@ module.exports = function ProxmoxApi(hostname, user, pve, password){
 		var par = this;
 		var req = http.request(options, function(res){
 			res.setEncoding('utf8');
-		    res.on('data', function (chunk) {
-		    	//Error handling to do
-		    	var data = JSON.parse(chunk).data;
-		        par.token = {ticket: data.ticket, CSRFPreventionToken: data.CSRFPreventionToken};
-		    	par.tokenTimestamp = new Date().getTime();	
-		    	if(typeof(callback) == 'function')
-		    		callback();
-		    });
+		    var _data = '';
+			res.on('data', function (chunk) {
+				//Error handling to do
+				_data += chunk;
+			});
+			res.on('end', function () {
+				var data = JSON.parse(_data).data;
+				par.token = {ticket: data.ticket, CSRFPreventionToken: data.CSRFPreventionToken};
+				par.tokenTimestamp = new Date().getTime();
+				if (typeof(callback) == 'function')
+					callback();
+			});
 		});
 		req.write(body);
 		req.end();
