@@ -16,6 +16,15 @@ export class ProxmoxError extends Error {
   }
 }
 
+/** Validate and coerce a VMID to a safe integer string. */
+function safeVmid(vmid) {
+  const n = Number(vmid);
+  if (!Number.isInteger(n) || n < 1) {
+    throw new ProxmoxError(`Invalid VMID: ${vmid} (must be a positive integer)`);
+  }
+  return String(n);
+}
+
 /**
  * Modern Proxmox VE API client.
  *
@@ -37,6 +46,7 @@ export class ProxmoxClient {
   #rejectUnauthorized;
   #timeout;
   #basePath;
+  #loginPromise;
 
   /**
    * @param {string} hostname - Proxmox host (IP or FQDN)
@@ -68,6 +78,7 @@ export class ProxmoxClient {
     this.#ticket = null;
     this.#csrfToken = null;
     this.#ticketExpiry = 0;
+    this.#loginPromise = null;
 
     const hasToken = this.#tokenId && this.#tokenSecret;
     const hasCredentials = this.#username && this.#password;
@@ -93,6 +104,18 @@ export class ProxmoxClient {
   async login() {
     if (this.isTokenAuth) return;
 
+    // Prevent concurrent login attempts — reuse the in-flight promise
+    if (this.#loginPromise) return this.#loginPromise;
+
+    this.#loginPromise = this.#doLogin();
+    try {
+      await this.#loginPromise;
+    } finally {
+      this.#loginPromise = null;
+    }
+  }
+
+  async #doLogin() {
     const body = new URLSearchParams({
       username: `${this.#username}@${this.#realm}`,
       password: this.#password,
@@ -159,12 +182,12 @@ export class ProxmoxClient {
 
   /** Get VM config. */
   async getQemuConfig(node, vmid) {
-    return this.get(`/nodes/${encodeURIComponent(node)}/qemu/${vmid}/config`);
+    return this.get(`/nodes/${encodeURIComponent(node)}/qemu/${safeVmid(vmid)}/config`);
   }
 
   /** Get VM status (current runtime info). */
   async getQemuStatus(node, vmid) {
-    return this.get(`/nodes/${encodeURIComponent(node)}/qemu/${vmid}/status/current`);
+    return this.get(`/nodes/${encodeURIComponent(node)}/qemu/${safeVmid(vmid)}/status/current`);
   }
 
   /** Create a new VM. */
@@ -174,77 +197,77 @@ export class ProxmoxClient {
 
   /** Update VM config. */
   async updateQemuConfig(node, vmid, config) {
-    return this.put(`/nodes/${encodeURIComponent(node)}/qemu/${vmid}/config`, config);
+    return this.put(`/nodes/${encodeURIComponent(node)}/qemu/${safeVmid(vmid)}/config`, config);
   }
 
   /** Delete a VM. */
   async deleteQemu(node, vmid, params) {
-    return this.del(`/nodes/${encodeURIComponent(node)}/qemu/${vmid}`, params);
+    return this.del(`/nodes/${encodeURIComponent(node)}/qemu/${safeVmid(vmid)}`, params);
   }
 
   /** Start a VM. */
   async startQemu(node, vmid) {
-    return this.post(`/nodes/${encodeURIComponent(node)}/qemu/${vmid}/status/start`);
+    return this.post(`/nodes/${encodeURIComponent(node)}/qemu/${safeVmid(vmid)}/status/start`);
   }
 
   /** Stop a VM. */
   async stopQemu(node, vmid) {
-    return this.post(`/nodes/${encodeURIComponent(node)}/qemu/${vmid}/status/stop`);
+    return this.post(`/nodes/${encodeURIComponent(node)}/qemu/${safeVmid(vmid)}/status/stop`);
   }
 
   /** Shutdown a VM (ACPI). */
   async shutdownQemu(node, vmid) {
-    return this.post(`/nodes/${encodeURIComponent(node)}/qemu/${vmid}/status/shutdown`);
+    return this.post(`/nodes/${encodeURIComponent(node)}/qemu/${safeVmid(vmid)}/status/shutdown`);
   }
 
   /** Reboot a VM (ACPI). */
   async rebootQemu(node, vmid) {
-    return this.post(`/nodes/${encodeURIComponent(node)}/qemu/${vmid}/status/reboot`);
+    return this.post(`/nodes/${encodeURIComponent(node)}/qemu/${safeVmid(vmid)}/status/reboot`);
   }
 
   /** Reset a VM. */
   async resetQemu(node, vmid) {
-    return this.post(`/nodes/${encodeURIComponent(node)}/qemu/${vmid}/status/reset`);
+    return this.post(`/nodes/${encodeURIComponent(node)}/qemu/${safeVmid(vmid)}/status/reset`);
   }
 
   /** Suspend a VM. */
   async suspendQemu(node, vmid) {
-    return this.post(`/nodes/${encodeURIComponent(node)}/qemu/${vmid}/status/suspend`);
+    return this.post(`/nodes/${encodeURIComponent(node)}/qemu/${safeVmid(vmid)}/status/suspend`);
   }
 
   /** Resume a VM. */
   async resumeQemu(node, vmid) {
-    return this.post(`/nodes/${encodeURIComponent(node)}/qemu/${vmid}/status/resume`);
+    return this.post(`/nodes/${encodeURIComponent(node)}/qemu/${safeVmid(vmid)}/status/resume`);
   }
 
   /** Clone a VM. */
   async cloneQemu(node, vmid, params) {
-    return this.post(`/nodes/${encodeURIComponent(node)}/qemu/${vmid}/clone`, params);
+    return this.post(`/nodes/${encodeURIComponent(node)}/qemu/${safeVmid(vmid)}/clone`, params);
   }
 
   /** Migrate a VM to another node. */
   async migrateQemu(node, vmid, params) {
-    return this.post(`/nodes/${encodeURIComponent(node)}/qemu/${vmid}/migrate`, params);
+    return this.post(`/nodes/${encodeURIComponent(node)}/qemu/${safeVmid(vmid)}/migrate`, params);
   }
 
   /** Create a snapshot of a VM. */
   async snapshotQemu(node, vmid, params) {
-    return this.post(`/nodes/${encodeURIComponent(node)}/qemu/${vmid}/snapshot`, params);
+    return this.post(`/nodes/${encodeURIComponent(node)}/qemu/${safeVmid(vmid)}/snapshot`, params);
   }
 
   /** List snapshots of a VM. */
   async listQemuSnapshots(node, vmid) {
-    return this.get(`/nodes/${encodeURIComponent(node)}/qemu/${vmid}/snapshot`);
+    return this.get(`/nodes/${encodeURIComponent(node)}/qemu/${safeVmid(vmid)}/snapshot`);
   }
 
   /** Execute a QEMU guest agent command. */
   async qemuAgentExec(node, vmid, params) {
-    return this.post(`/nodes/${encodeURIComponent(node)}/qemu/${vmid}/agent/exec`, params);
+    return this.post(`/nodes/${encodeURIComponent(node)}/qemu/${safeVmid(vmid)}/agent/exec`, params);
   }
 
   /** Get QEMU guest agent exec status. */
   async qemuAgentExecStatus(node, vmid, pid) {
-    return this.get(`/nodes/${encodeURIComponent(node)}/qemu/${vmid}/agent/exec-status`, { pid });
+    return this.get(`/nodes/${encodeURIComponent(node)}/qemu/${safeVmid(vmid)}/agent/exec-status`, { pid });
   }
 
   // ── LXC Containers ───────────────────────────────────────────────
@@ -256,12 +279,12 @@ export class ProxmoxClient {
 
   /** Get container config. */
   async getLxcConfig(node, vmid) {
-    return this.get(`/nodes/${encodeURIComponent(node)}/lxc/${vmid}/config`);
+    return this.get(`/nodes/${encodeURIComponent(node)}/lxc/${safeVmid(vmid)}/config`);
   }
 
   /** Get container status. */
   async getLxcStatus(node, vmid) {
-    return this.get(`/nodes/${encodeURIComponent(node)}/lxc/${vmid}/status/current`);
+    return this.get(`/nodes/${encodeURIComponent(node)}/lxc/${safeVmid(vmid)}/status/current`);
   }
 
   /** Create a new container. */
@@ -271,52 +294,52 @@ export class ProxmoxClient {
 
   /** Update container config. */
   async updateLxcConfig(node, vmid, config) {
-    return this.put(`/nodes/${encodeURIComponent(node)}/lxc/${vmid}/config`, config);
+    return this.put(`/nodes/${encodeURIComponent(node)}/lxc/${safeVmid(vmid)}/config`, config);
   }
 
   /** Delete a container. */
   async deleteLxc(node, vmid, params) {
-    return this.del(`/nodes/${encodeURIComponent(node)}/lxc/${vmid}`, params);
+    return this.del(`/nodes/${encodeURIComponent(node)}/lxc/${safeVmid(vmid)}`, params);
   }
 
   /** Start a container. */
   async startLxc(node, vmid) {
-    return this.post(`/nodes/${encodeURIComponent(node)}/lxc/${vmid}/status/start`);
+    return this.post(`/nodes/${encodeURIComponent(node)}/lxc/${safeVmid(vmid)}/status/start`);
   }
 
   /** Stop a container. */
   async stopLxc(node, vmid) {
-    return this.post(`/nodes/${encodeURIComponent(node)}/lxc/${vmid}/status/stop`);
+    return this.post(`/nodes/${encodeURIComponent(node)}/lxc/${safeVmid(vmid)}/status/stop`);
   }
 
   /** Shutdown a container. */
   async shutdownLxc(node, vmid) {
-    return this.post(`/nodes/${encodeURIComponent(node)}/lxc/${vmid}/status/shutdown`);
+    return this.post(`/nodes/${encodeURIComponent(node)}/lxc/${safeVmid(vmid)}/status/shutdown`);
   }
 
   /** Reboot a container. */
   async rebootLxc(node, vmid) {
-    return this.post(`/nodes/${encodeURIComponent(node)}/lxc/${vmid}/status/reboot`);
+    return this.post(`/nodes/${encodeURIComponent(node)}/lxc/${safeVmid(vmid)}/status/reboot`);
   }
 
   /** Clone a container. */
   async cloneLxc(node, vmid, params) {
-    return this.post(`/nodes/${encodeURIComponent(node)}/lxc/${vmid}/clone`, params);
+    return this.post(`/nodes/${encodeURIComponent(node)}/lxc/${safeVmid(vmid)}/clone`, params);
   }
 
   /** Migrate a container to another node. */
   async migrateLxc(node, vmid, params) {
-    return this.post(`/nodes/${encodeURIComponent(node)}/lxc/${vmid}/migrate`, params);
+    return this.post(`/nodes/${encodeURIComponent(node)}/lxc/${safeVmid(vmid)}/migrate`, params);
   }
 
   /** Create a snapshot of a container. */
   async snapshotLxc(node, vmid, params) {
-    return this.post(`/nodes/${encodeURIComponent(node)}/lxc/${vmid}/snapshot`, params);
+    return this.post(`/nodes/${encodeURIComponent(node)}/lxc/${safeVmid(vmid)}/snapshot`, params);
   }
 
   /** List snapshots of a container. */
   async listLxcSnapshots(node, vmid) {
-    return this.get(`/nodes/${encodeURIComponent(node)}/lxc/${vmid}/snapshot`);
+    return this.get(`/nodes/${encodeURIComponent(node)}/lxc/${safeVmid(vmid)}/snapshot`);
   }
 
   // ── Storage ───────────────────────────────────────────────────────
@@ -488,12 +511,12 @@ export class ProxmoxClient {
 
   /** Get VM firewall rules. */
   async getQemuFirewallRules(node, vmid) {
-    return this.get(`/nodes/${encodeURIComponent(node)}/qemu/${vmid}/firewall/rules`);
+    return this.get(`/nodes/${encodeURIComponent(node)}/qemu/${safeVmid(vmid)}/firewall/rules`);
   }
 
   /** Get container firewall rules. */
   async getLxcFirewallRules(node, vmid) {
-    return this.get(`/nodes/${encodeURIComponent(node)}/lxc/${vmid}/firewall/rules`);
+    return this.get(`/nodes/${encodeURIComponent(node)}/lxc/${safeVmid(vmid)}/firewall/rules`);
   }
 
   // ── Backup ────────────────────────────────────────────────────────

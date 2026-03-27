@@ -289,6 +289,90 @@ describe('Error handling', () => {
   });
 });
 
+// ── VMID validation ──────────────────────────────────────────────────
+
+describe('VMID validation', () => {
+  let server, port, client;
+
+  beforeAll(async () => {
+    ({ server, port } = await createMockServer((req, res) => {
+      jsonResponse(res, { safe: true, url: req.url });
+    }));
+    client = new ProxmoxClient('127.0.0.1', {
+      port, scheme: 'http',
+      tokenId: 'root@pam!test', tokenSecret: 'test',
+    });
+  });
+
+  afterAll(() => server.close());
+
+  test('rejects path-traversal vmid', async () => {
+    await expect(client.getQemuConfig('pve1', '100/../../access/users'))
+      .rejects.toThrow('Invalid VMID');
+  });
+
+  test('rejects non-numeric vmid', async () => {
+    await expect(client.startQemu('pve1', 'abc'))
+      .rejects.toThrow('Invalid VMID');
+  });
+
+  test('rejects negative vmid', async () => {
+    await expect(client.getLxcConfig('pve1', -5))
+      .rejects.toThrow('Invalid VMID');
+  });
+
+  test('accepts numeric string vmid', async () => {
+    const result = await client.getQemuConfig('pve1', '100');
+    expect(result).toBeDefined();
+  });
+
+  test('accepts integer vmid', async () => {
+    const result = await client.getQemuConfig('pve1', 100);
+    expect(result).toBeDefined();
+  });
+});
+
+// ── Login race condition ─────────────────────────────────────────────
+
+describe('Concurrent login', () => {
+  let server, port, client, loginCount;
+
+  beforeAll(async () => {
+    loginCount = 0;
+    ({ server, port } = await createMockServer((req, res) => {
+      if (req.url === '/api2/json/access/ticket' && req.method === 'POST') {
+        loginCount++;
+        req.on('data', () => {});
+        req.on('end', () => {
+          jsonResponse(res, {
+            ticket: 'PVE:root@pam:TICKET',
+            CSRFPreventionToken: 'CSRF',
+          });
+        });
+        return;
+      }
+      jsonResponse(res, [{ node: 'pve1' }]);
+    }));
+
+    client = new ProxmoxClient('127.0.0.1', {
+      port, scheme: 'http',
+      username: 'root', password: 'test', realm: 'pam',
+    });
+  });
+
+  afterAll(() => server.close());
+
+  test('concurrent requests only trigger one login', async () => {
+    const results = await Promise.all([
+      client.getNodes(),
+      client.getNodes(),
+      client.getNodes(),
+    ]);
+    expect(results).toHaveLength(3);
+    expect(loginCount).toBe(1);
+  });
+});
+
 // ── ProxmoxError ─────────────────────────────────────────────────────
 
 describe('ProxmoxError', () => {
