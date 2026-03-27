@@ -21,9 +21,14 @@
     "lint:fix": "eslint src/ test/ --fix",
     "prepublishOnly": "npm run lint && npm test"
   },
+  "author": "alo-is",
   "repository": {
     "type": "git",
     "url": "https://github.com/alo-is/node-proxmox.git"
+  },
+  "homepage": "https://github.com/alo-is/node-proxmox#readme",
+  "bugs": {
+    "url": "https://github.com/alo-is/node-proxmox/issues"
   },
   "keywords": [
     "proxmox",
