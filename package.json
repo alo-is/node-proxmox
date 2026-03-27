@@ -1,16 +1,53 @@
 {
-    "name": "node-proxmox",
-    "description": "A simple Proxmox VE NodeJs Module, asynchronous",
-    "repository": {
-	    "type": "git",
-	    "url": "https://github.com/maloddon/node-proxmox.git"
-	},
-    "version": "0.1.2",
-    "license": "GPLv2",
-    "main": "node-proxmox.js",
-    "keywords": [
-	    "proxmox",
-	    "api",
-	    "openvz"
-	]
+  "name": "node-proxmox",
+  "version": "2.0.0",
+  "description": "Modern Proxmox VE API client for Node.js — supports PVE 7.x/8.x, API tokens, async/await",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./src/index.js",
+      "require": "./src/index.cjs"
+    }
+  },
+  "main": "./src/index.cjs",
+  "module": "./src/index.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "test": "node --experimental-vm-modules node_modules/.bin/jest",
+    "test:ci": "node --experimental-vm-modules node_modules/.bin/jest --ci --coverage",
+    "lint": "eslint src/ test/",
+    "lint:fix": "eslint src/ test/ --fix",
+    "prepublishOnly": "npm run lint && npm test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alo-is/node-proxmox.git"
+  },
+  "keywords": [
+    "proxmox",
+    "proxmox-ve",
+    "pve",
+    "api",
+    "qemu",
+    "lxc",
+    "kvm",
+    "virtualization",
+    "containers",
+    "homelab",
+    "api-token"
+  ],
+  "license": "GPL-2.0",
+  "files": [
+    "src/",
+    "UPGRADE.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "jest": "^30.0.0-alpha.6",
+    "@jest/globals": "^30.0.0-alpha.6"
+  }
 }
